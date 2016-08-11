@@ -1,9 +1,9 @@
 var path = require('path')
 var crypto = require('crypto')
-var channel = require('discovery-channel')
-var swarmDefaults = require('datland-swarm-defaults')
-var Dat = require('dat-js')
+var pump = require('pump')
 var mkdirp = require('mkdirp')
+var Dat = require('dat-js')
+var peerNetwork = require('peer-network')
 
 module.exports = Archiver
 
@@ -12,39 +12,39 @@ function Archiver (options) {
   var self = this
   
   if (!options) options = {}
-  if (!options.dats) throw new Error('must specify directory to store dats')
-  options.dht = false
-  this._discovery = channel(swarmDefaults(options))
-  this._discovery.on('peer', onpeer)
-  this._discovery.on('whoami', onwhoami)
-  var peers = {}
-  
-  function onpeer (id, peer, type) {
-    console.log('onpeer', id, peer, type)
-    var peerkey = peer.host + ':' + peer.port
-    if (peers[peerkey]) return console.log('skipping existing peer', peerkey)
-    var datDir = path.join(options.dats, id.toString())
-    mkdirp.sync(datDir)
-    var dat = peers[peerkey] = Dat({dir: datDir})
-    dat.on('ready', function () {
-      console.log('dat ready')
-      dat.download(function (err) {
-        if (err) console.error('download err', err)
-        console.log('download success')
-      })
-    })
-    
-    // this._discovery.destroy()
-    // this._discovery.leave(id)
-  }
-  
-  function onwhoami (me) {
-    console.log('onwhoami', me)
-    
-  }
+  if (!options.dir) throw new Error('must specify directory to store dats')
+  self.options = options
+  self.peers = {}
+  self.servers = {}
+
+  this.network = peerNetwork()
 }
 
 Archiver.prototype.join = function (key) {
-  if (!key) key = crypto.randomBytes(16).toHex() // todo is this as secure as a 32 char truncated sha256
-  this._discovery.join(key)
+  var self = this
+  if (!key) throw new Error('must specify key')
+  if (self.servers[key]) throw new Error('already joined that key')
+  var server = this.servers[key] = self.network.createServer()
+  server.on('connection', function (stream) {
+    console.log('new connection')
+    readKey()
+    function readKey () {
+      var datKey = stream.read(32)
+      if (!datKey) return stream.once('readable', readKey)
+      datKey = datKey.toString('hex')
+      var datDir = path.join(self.options.dir, datKey)
+      mkdirp.sync(datDir)
+      var dat = self.peers[datKey] = Dat({dir: datDir, discovery: false, key: datKey})
+      dat.on('ready', function () {
+        console.log('dat ready')
+        var replicator = dat.archive.replicate()
+        pump(stream, replicator, stream, function (err) {
+          if (err) throw err
+          dat.close()
+          console.log('done')
+        })
+      }) 
+    }
+  })
+  server.listen(key)
 }
