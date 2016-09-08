@@ -24,9 +24,9 @@ function Archiver (options) {
   self.getArchive = options.getArchive || getArchive
 
   function getArchive(key, cb) {
-    var datDir = path.join(self.options.dir, datKey)
+    var datDir = path.join(self.options.dir, key)
     mkdirp.sync(datDir)
-    var dat = self.peers[datKey] = Dat({dir: datDir, discovery: false, key: datKey})
+    var dat = self.peers[key] = Dat({dir: datDir, discovery: false, key: key})
     dat.open(function (err) {
       if (err) return cb(err)
       console.log('dat ready')
