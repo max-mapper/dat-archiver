@@ -50,10 +50,10 @@ Archiver.prototype.join = function (key) {
       datKey = datKey.toString('hex')
       self.emit('key-received', datKey)
       self.getArchive(datKey, function (err, archive, cb) {
-        if (err) throw err
+        if (err) self.emit('error', err)
         self.emit('archive-replicating', datKey)
         pump(stream, archive.replicate(), stream, function (err) {
-          if (err) throw err
+          if (err) self.emit('error', err)
           self.emit('archive-finished', datKey)
           cb()
         })
