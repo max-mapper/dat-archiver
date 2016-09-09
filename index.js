@@ -23,13 +23,12 @@ function Archiver (options) {
   self.network = peerNetwork()
   self.getArchive = options.getArchive || getArchive
 
-  function getArchive(key, cb) {
-    var datDir = path.join(self.options.dir, key)
+  function getArchive(datKey, cb) {
+    var datDir = path.join(self.options.dir, datKey)
     mkdirp.sync(datDir)
-    var dat = self.peers[key] = Dat({dir: datDir, discovery: false, key: key})
+    var dat = self.peers[datKey] = Dat({dir: datDir, discovery: false, key: datKey})
     dat.open(function (err) {
       if (err) return cb(err)
-      console.log('dat ready')
       cb(null, dat.archive)
     })
   }
@@ -52,10 +51,15 @@ Archiver.prototype.join = function (key) {
       self.getArchive(datKey, function (err, archive, cb) {
         if (err) self.emit('error', err)
         self.emit('archive-replicating', datKey)
+        archive.metadata.once('download-finished', function () {
+          archive.content.once('download-finished', function () {
+            self.emit('archive-finished', datKey)
+          })
+        })
         pump(stream, archive.replicate(), stream, function (err) {
           if (err) self.emit('error', err)
-          self.emit('archive-finished', datKey)
-          cb()
+          stream.end()
+          if (cb) cb()
         })
       })
     }
