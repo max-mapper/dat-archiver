@@ -1,7 +1,6 @@
 var path = require('path')
 var events = require('events')
 var util = require('util')
-var crypto = require('crypto')
 var pump = require('pump')
 var mkdirp = require('mkdirp')
 var Dat = require('dat-js')
@@ -23,7 +22,7 @@ function Archiver (options) {
   self.network = peerNetwork()
   self.getArchive = options.getArchive || getArchive
 
-  function getArchive(datKey, cb) {
+  function getArchive (datKey, cb) {
     var datDir = path.join(self.options.dir, datKey)
     mkdirp.sync(datDir)
     var dat = self.peers[datKey] = Dat({dir: datDir, discovery: false, key: datKey})
@@ -41,14 +40,14 @@ Archiver.prototype.join = function (key) {
   if (self.servers[key]) throw new Error('already joined that key')
   var server = this.servers[key] = self.network.createServer()
   server.on('connection', function (stream) {
-    self.emit('connection')
+    self.emit('connection', key)
     readKey()
     function readKey () {
       var datKey = stream.read(32)
       if (!datKey) return stream.once('readable', readKey)
       datKey = datKey.toString('hex')
       self.emit('key-received', datKey)
-      self.getArchive(datKey, function (err, archive, cb) {
+      self.getArchive(datKey, function (err, archive) {
         if (err) self.emit('error', err)
         self.emit('archive-replicating', datKey)
         archive.metadata.once('download-finished', function () {
@@ -59,7 +58,6 @@ Archiver.prototype.join = function (key) {
         pump(stream, archive.replicate(), stream, function (err) {
           if (err) self.emit('error', err)
           stream.end()
-          if (cb) cb()
         })
       })
     }
