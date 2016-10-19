@@ -1,7 +1,6 @@
 var path = require('path')
 var events = require('events')
 var util = require('util')
-var crypto = require('crypto')
 var pump = require('pump')
 var mkdirp = require('mkdirp')
 var peerNetwork = require('peer-network')

@@ -18,13 +18,11 @@
   "homepage": "https://github.com/maxogden/dat-archiver#readme",
   "description": "",
   "dependencies": {
-    "dat-encoding": "^3.0.1",
     "hypercore-archiver": "^1.0.0",
     "minimist": "^1.2.0",
     "mkdirp": "^0.5.1",
     "peer-network": "^1.1.0",
-    "pump": "^1.0.1",
-    "stream-each": "^1.1.2"
+    "pump": "^1.0.1"
   },
   "devDependencies": {
     "tape": "^4.6.0"
