@@ -1,49 +1,52 @@
 var path = require('path')
-var crypto = require('crypto')
+var events = require('events')
+var util = require('util')
 var pump = require('pump')
 var mkdirp = require('mkdirp')
-var Dat = require('dat-js')
 var peerNetwork = require('peer-network')
+var coreArchiver = require('hypercore-archiver')
 
 module.exports = Archiver
 
 function Archiver (options) {
   if (!(this instanceof Archiver)) return new Archiver(options)
-  var self = this
-  
   if (!options) options = {}
   if (!options.dir) throw new Error('must specify directory to store dats')
-  self.options = options
-  self.peers = {}
-  self.servers = {}
+  events.EventEmitter.call(this)
 
-  this.network = peerNetwork()
+  var self = this
+  self.options = options
+  self.servers = {}
+  self.network = peerNetwork()
+
+  mkdirp.sync(path.join(options.dir, 'data'))
+  self.archives = coreArchiver(options.dir)
 }
+util.inherits(Archiver, events.EventEmitter)
 
 Archiver.prototype.join = function (key) {
   var self = this
-  if (!key) throw new Error('must specify key')
-  if (self.servers[key]) throw new Error('already joined that key')
-  var server = this.servers[key] = self.network.createServer()
+  if (!key) return self.emit('error', new Error('must specify key'))
+  if (self.servers[key]) return self.emit('error', new Error('already joined that key'))
+
+  var server = self.servers[key] = self.network.createServer()
   server.on('connection', function (stream) {
-    console.log('new connection')
+    self.emit('connection', key)
     readKey()
+
     function readKey () {
       var datKey = stream.read(32)
       if (!datKey) return stream.once('readable', readKey)
-      datKey = datKey.toString('hex')
-      var datDir = path.join(self.options.dir, datKey)
-      mkdirp.sync(datDir)
-      var dat = self.peers[datKey] = Dat({dir: datDir, discovery: false, key: datKey})
-      dat.on('ready', function () {
-        console.log('dat ready')
-        var replicator = dat.archive.replicate()
-        pump(stream, replicator, stream, function (err) {
-          if (err) throw err
-          dat.close()
-          console.log('done')
+      self.emit('key received', datKey)
+
+      self.archives.add(datKey, function (err) {
+        if (err) return self.emit('error', err)
+        self.emit('replication started', datKey)
+        pump(stream, self.archives.replicate(), stream, function (err) {
+          if (err) return self.emit('error', err)
+          self.emit('replication ended', datKey)
         })
-      }) 
+      })
     }
   })
   server.listen(key)

@@ -18,7 +18,7 @@
   "homepage": "https://github.com/maxogden/dat-archiver#readme",
   "description": "",
   "dependencies": {
-    "dat-js": "^2.0.0",
+    "hypercore-archiver": "^1.0.0",
     "minimist": "^1.2.0",
     "mkdirp": "^0.5.1",
     "peer-network": "^1.1.0",
